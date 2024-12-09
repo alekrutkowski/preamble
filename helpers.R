@@ -4,6 +4,18 @@ library(collapse)
 library(openxlsx2)
 library(magrittr)
 
+EUMS <-
+  c("BE", "BG", "CZ", "DK", "DE", "EE", "IE", "EL", "ES", "FR", 
+    "HR", "IT", "CY", "LV", "LT", "LU", "HU", "MT", "NL", "AT", "PL", 
+    "PT", "RO", "SI", "SK", "FI", "SE")
+EUMSnames <-
+    c("BE"='Belgium', "BG"='Bulgaria', "CZ"='Czechia', "DK"='Denmark', "DE"='Germany',
+      "EE"='Estonia', "IE"='Ireland', "EL"='Greece', "ES"='Spain', "FR"='France', 
+      "HR"='Croatia', "IT"='Italy', "CY"='Cyprus', "LV"='Latvia', "LT"='Lithuania',
+      "LU"='Luxembourg', "HU"='Hungary', "MT"='Malta', "NL"='the Netherlands',
+      "AT"='Austria', "PL"='Poland', "PT"='Portugal', "RO"='Romania', "SI"='Slovenia',
+      "SK"='Slovakia', "FI"='Finland', "SE"='Sweden')
+
 `%not in%` <- Negate(`%in%`)
 
 `%without%` <- setdiff
