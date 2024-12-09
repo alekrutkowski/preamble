@@ -142,3 +142,18 @@ mlapply <- function(.Fun, ..., .Cluster=NULL, .parFun=parallel::parLapply) {
             parse(text=.))
 }
 
+# A wrapper for base::split taking as an argument the expected number of sub-elements
+split_into <- function(x, n, sorted=TRUE)
+  ## x -- a vector (atomic or list)
+  ## n -- the number of elements (groups)
+  ## returns a list with n elements
+  ## each containing some of the elements of x
+  n %>%
+  seq_len %>%
+  rep.int(x %>%
+            length %>%
+            divide_by(n) %>%
+            ceiling) %>%
+  `if`(sorted, sort(.), .) %>%
+  extract(seq_along(x)) %>%
+  split(x,.)
