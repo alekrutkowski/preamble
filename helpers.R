@@ -75,3 +75,22 @@ filterDTrowsWithinGroups <-
            else
              2]]]
     }))
+
+# R function for dealing with (ignoring) missing/empty arguments inside ellipsis (...)
+# > list(a=1,,b=2:10)
+# Error in list(a = 1, , b = 2:10) : argument 2 is empty
+# > listWithoutEmptyArgs(a=1,,b=2:10)
+# list(a = 1, b = 2:10)    
+listWithoutEmptyArgs <- function(...)
+  eval(Filter(\(x) !identical(as.character(x), "") || identical(x,""),
+              bquote(.(substitute(list(...))))))
+
+# R function to avoid the repetitions in situations like `list(first = first, second = second, third = third)`
+namedList <- function(...) {
+    # Capture the variable names as symbols
+    # and convert symbols to character names
+    var_names <- as.character(as.list(substitute(list(...)))[-1])
+    # Create a named list
+    stats::setNames(mget(var_names, envir = parent.frame()), var_names)
+}
+
