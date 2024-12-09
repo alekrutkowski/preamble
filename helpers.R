@@ -89,6 +89,20 @@ summaries <- function(dt, col_names, fun_names, additional_code=NULL, by=NULL, s
              ')]')
   ))
 
+# Filtering R data.table rows by condition within groups
+filterDTrowsWithinGroups <-
+  function(DT, row_filtering_expression, by, dot_is_list=TRUE)
+    eval(bquote({
+      if (dot_is_list)
+        . <- list # data.table's alias
+      DT[DT[, .(substitute(row_filtering_expression))
+            , by = .(substitute(by))]
+         [[if (is.list(.(substitute(by))))
+             length(.(substitute(by))) + 1
+           else
+             2]]]
+    }))
+           
 # Import all sheets in the Excel file as a list of data.frames
 # like in the previous package version (openxlsx)
 readAllSheets <- function(xlsx_file_name, drop_empty_sheets=TRUE,
@@ -104,20 +118,6 @@ readAllSheets <- function(xlsx_file_name, drop_empty_sheets=TRUE,
            ,.),
     simplify=FALSE) %>% 
   .[!sapply(.,is.null)]
-
-# Filtering R data.table rows by condition within groups
-filterDTrowsWithinGroups <-
-  function(DT, row_filtering_expression, by, dot_is_list=TRUE)
-    eval(bquote({
-      if (dot_is_list)
-        . <- list # data.table's alias
-      DT[DT[, .(substitute(row_filtering_expression))
-            , by = .(substitute(by))]
-         [[if (is.list(.(substitute(by))))
-             length(.(substitute(by))) + 1
-           else
-             2]]]
-    }))
 
 # Useful for Eurostat data
 monthToQuarter <- function(charvec, safe=TRUE) {
