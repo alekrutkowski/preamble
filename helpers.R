@@ -58,6 +58,37 @@ renameColumns <- function(dt, ...) {
   setnames(dt, from, to)
 }
 
+# R data.table: Summarize each column with each function and name the new columns automatically
+#    ##    Usage example:
+#    summaries(dt=my_dt,
+#              col_names=c('x','y'),
+#              fun_names=c('Sum','Mean','Median'),
+#              additional_code='Count=length(x)',
+#              by=c('A','B'))
+#    ##    Generated code:
+#    #     dt[,.(`Sum__x`=`Sum`(x),
+#    #           `Sum__y`=`Sum`(y),
+#    #           `Mean__x`=`Mean`(x),
+#    #           `Mean__y`=`Mean`(y),
+#    #           `Median__x`=`Median`(x),
+#    #           `Median__y`=`Median`(y),
+#    #           Count=length(x))
+#    #       ,by=c("A","B")]
+summaries <- function(dt, col_names, fun_names, additional_code=NULL, by=NULL, sep='__')
+  eval(parse(
+    text=
+      expand.grid(var=col_names, fun=fun_names) %>% 
+      {paste0('`',.$fun,sep,.$var,'`=`',.$fun,'`(',.$var,')')} %>%
+      c(additional_code) %>% 
+      paste(collapse=',') %>% 
+      paste0('dt[,.(',.,'),by=c(',
+             by %>% 
+               gsub('"','\\"',.,fixed=TRUE) %>%
+               paste0('"',.,'"') %>% 
+               paste(collapse=','),
+             ')]')
+  ))
+
 # Import all sheets in the Excel file as a list of data.frames
 # like in the previous package version (openxlsx)
 readAllSheets <- function(xlsx_file_name, drop_empty_sheets=TRUE,
