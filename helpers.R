@@ -119,6 +119,24 @@ filterDTrowsWithinGroups <-
              2]]]
     }))
 
+# Useful for Eurostat data
+monthToQuarter <- function(charvec, safe=TRUE) {
+  # monthToQuarter(c('2022M01','2022M02','2022M03','2022M04',
+  #                 NA_character_,'2022M12'))
+  # #  "2022Q1"  "2022Q1"  "2022Q1"  "2022Q2"  NA  "2022Q4"
+  if (safe)
+    stopifnot(all(grepl('^[1-2][0-9]{3}M[0-1][0-9]',
+                        charvec) | is.na(charvec)))
+  yr <-
+    sub('(....)M..','\\1',charvec)
+  qr <-
+    sub('....M(..)','\\1',charvec) %>% 
+    as.integer() %>% 
+    {as.integer((. - 1)/3) + 1}
+  ifelse(is.na(charvec), NA_character_,
+         paste0(yr,'Q',qr))
+}
+
 # R function for dealing with (ignoring) missing/empty arguments inside ellipsis (...)
 # > list(a=1,,b=2:10)
 # Error in list(a = 1, , b = 2:10) : argument 2 is empty
