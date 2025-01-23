@@ -45,7 +45,8 @@ v <- function(...)
   as.character
 
 # Example:
-#  renameColumns("Sickness/Health care" -> SICK,
+#  renameColumns(my.data.table,
+#                "Sickness/Health care" -> SICK,
 #                Disability -> DISA,
 #                "Old age" -> OLD,
 #                Survivors -> SURVIV,
