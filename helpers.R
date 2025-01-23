@@ -26,6 +26,16 @@ EUMSnames <-
 
 `%equals%` <- identical
 
+`%==%` <- function(x,y)
+  ifelse(is.na(x) | is.na(y),
+         is.na(x) & is.na(y),
+         x == y)
+
+`%!=%` <- function(x,y)
+  ifelse(is.na(x) | is.na(y),
+         is.na(x) & !is.na(y) | !is.na(x) & is.na(y),
+         x != y)
+
 # To avoid typing single or double quotes:
 # symbols -> strings
 v <- function(...) 
