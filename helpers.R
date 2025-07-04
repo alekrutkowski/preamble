@@ -44,6 +44,12 @@ v <- function(...)
   tail(-1) %>% 
   as.character
 
+readMarkDownTable <- function(markdown_string)
+  markdown_string %>% 
+  fread(sep="|", header=TRUE, encoding='UTF-8') %>% 
+  .[-1] %>% 
+  .[, sapply(.,\(col) !is.logical(col)), with=FALSE]
+
 # Example:
 #  renameColumns(my.data.table,
 #                "Sickness/Health care" -> SICK,
