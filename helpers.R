@@ -44,6 +44,9 @@ v <- function(...)
   tail(-1) %>% 
   as.character
 
+timeStamp <- function()
+  Sys.time() %>% gsub(':','.',.) %>% substr(1,19)
+
 readMarkDownTable <- function(markdown_string)
   markdown_string %>% 
   fread(sep="|", header=TRUE, encoding='UTF-8') %>% 
