@@ -238,3 +238,94 @@ split_into <- function(x, n, sorted=TRUE)
   `if`(sorted, sort(.), .) %>%
   extract(seq_along(x)) %>%
   split(x,.)
+
+
+# It overcomes the weakness of data.table's melt()
+# when using measure.vars=patterns(multiple regex patterns),
+# which results in a new column (named with variable.name)
+# holding column indexes instead of the
+# substrings extracted with the regex patterns.
+meltMultipleCols <- function(dt,
+                             id.vars,
+                             variable.name, 
+                             value.name__measure.vars.pattern__pairs) {
+  stopifnot(is.data.table(dt),
+            is.character(value.name__measure.vars.pattern__pairs),
+            length(value.name__measure.vars.pattern__pairs)>0,
+            !is.null(names(value.name__measure.vars.pattern__pairs)),
+            all(names(value.name__measure.vars.pattern__pairs)!=""),
+            all(!duplicated(names(value.name__measure.vars.pattern__pairs))),
+            all(!duplicated(value.name__measure.vars.pattern__pairs)))
+  value.name__measure.vars.pattern__pairs %>% 
+    names %>% 
+    lapply(function(x)
+      melt(dt,
+           id.vars = id.vars,
+           measure.vars = patterns(value.name__measure.vars.pattern__pairs[x]),
+           variable.name = variable.name, 
+           value.name = x,
+           variable.factor = FALSE) %>% 
+        .[, (variable.name) := 
+            get(variable.name) %>% 
+            sub(value.name__measure.vars.pattern__pairs[x],'\\1',.)]) %>% 
+    Reduce(x=.,
+           f=function(x1,x2)
+             merge(x1,x2,by=c(id.vars,variable.name)))
+}
+
+# # Example
+# dta <- 
+#   data.table(
+#     `id1` = 
+#       c(1L,2L,3L,4L,5L),
+#     `id2` = 
+#       c(11L,12L,13L,14L,15L),
+#     `x_a` = 
+#       c(8L,6L,3L,6L,7L),
+#     `x_c` = 
+#       c(6L,2L,5L,4L,1L),
+#     `x_b` = 
+#       c(3L,7L,6L,9L,7L),
+#     `y_c` = 
+#       c(6L,8L,9L,3L,9L),
+#     `y_a` = 
+#       c(2L,7L,3L,5L,1L),
+#     `y_b` = 
+#       c(5L,3L,3L,10L,4L)
+#   ) 
+
+
+# dta
+
+# #      id1   id2   x_a   x_c   x_b   y_c   y_a   y_b
+# #    <int> <int> <int> <int> <int> <int> <int> <int>
+# # 1:     1    11     8     6     3     6     2     5
+# # 2:     2    12     6     2     7     8     7     3
+# # 3:     3    13     3     5     6     9     3     3
+# # 4:     4    14     6     4     9     3     5    10
+# # 5:     5    15     7     1     7     9     1     4
+
+
+# meltMultipleCols(dta,
+#                  id.vars=c('id1','id2'),
+#                  variable.name='new_var',
+#                  value.name__measure.vars.pattern__pairs=
+#                    c(new_x = 'x_(.+)', new_y = 'y_(.+)'))
+
+# #       id1   id2 new_var new_x new_y
+# #     <int> <int>  <char> <int> <int>
+# #  1:     1    11       a     8     2
+# #  2:     1    11       b     3     5
+# #  3:     1    11       c     6     6
+# #  4:     2    12       a     6     7
+# #  5:     2    12       b     7     3
+# #  6:     2    12       c     2     8
+# #  7:     3    13       a     3     3
+# #  8:     3    13       b     6     3
+# #  9:     3    13       c     5     9
+# # 10:     4    14       a     6     5
+# # 11:     4    14       b     9    10
+# # 12:     4    14       c     4     3
+# # 13:     5    15       a     7     1
+# # 14:     5    15       b     7     4
+# # 15:     5    15       c     1     9
