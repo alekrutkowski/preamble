@@ -329,3 +329,17 @@ meltMultipleCols <- function(dt,
 # # 13:     5    15       a     7     1
 # # 14:     5    15       b     7     4
 # # 15:     5    15       c     1     9
+
+
+lapplyWithNames <- function(vector., function., simplify.=FALSE) {
+  if (is.null(names(vector.)))
+    stop('`vector.` has no names!')
+  if (anyDuplicated(names(vector.))!=0)
+    warning('There are duplicated names in `vector.`.')
+  if (any(names(vector.)==""))
+    warning('Some of the `vector.` items are not named.')
+  sapply(names(vector.),
+         \(name.) function.(vector., name.),
+         simplify=simplify.,
+         USE.NAMES=TRUE)
+}
