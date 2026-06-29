@@ -42,7 +42,9 @@ v <- function(...)
   substitute(list(...)) %>% 
   as.list %>% 
   tail(-1) %>% 
-  as.character
+  as.character %>% 
+  ifelse(.==make.names(.), .,
+         substr(.,2,nchar(.)-1))
 
 timeStamp <- function()
   Sys.time() %>% gsub(':','.',.) %>% substr(1,19)
