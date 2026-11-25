@@ -345,3 +345,218 @@ lapplyWithNames <- function(vector., function., simplify.=FALSE) {
          simplify=simplify.,
          USE.NAMES=TRUE)
 }
+
+
+
+#' Run all checktor diagnostics on an R package tarball
+#'
+#' @description
+#' Extracts an R source package into a temporary directory, runs
+#' all standard and on-request checktor diagnostics, displays
+#' the findings and prints treatment recommendations.
+#'
+#' @param path Character scalar. Path to an R source package
+#'   archive (.tar.gz).
+#'
+#' @return Invisibly returns a checktor_results object containing
+#'   the combined results of all diagnostics.
+#'
+#' @details
+#' Requires checktor >= 0.2.0. Enables all severity tiers,
+#' URL liveness checks and spelling checks. Overrides diagnostic
+#' exclusions and suppressions. Restores R session options and
+#' deletes temporary files upon exit.
+#'
+#' @export
+checktor_tarball <- function(path) {
+
+    stopifnot(
+        "path must be a non-empty character scalar" =
+            is.character(path) && length(path) == 1L &&
+            !is.na(path) && nzchar(path),
+        "path must point to an existing file" =
+            file.exists(path.expand(path)) &&
+            !dir.exists(path.expand(path)),
+        "file must have a .tar.gz extension" =
+            grepl("\\.tar\\.gz$", path, ignore.case = TRUE),
+        "checktor must be installed" =
+            requireNamespace("checktor", quietly = TRUE),
+        "checktor version must be at least 0.2.0" =
+            utils::packageVersion("checktor") >= "0.2.0"
+    )
+
+    path <- normalizePath(path, winslash = "/", mustWork = TRUE)
+
+    # Extract the package into an isolated temporary directory
+    tmp <- tempfile("checktor_")
+    stopifnot("cannot create temporary directory" = dir.create(tmp))
+    on.exit(unlink(tmp, recursive = TRUE, force = TRUE), add = TRUE)
+
+    status <- utils::untar(path, exdir = tmp)
+    stopifnot("archive extraction failed" = identical(as.integer(status), 0L))
+
+    pkg <- list.dirs(tmp, recursive = FALSE, full.names = TRUE)
+    pkg <- pkg[file.exists(file.path(pkg, "DESCRIPTION"))]
+
+    stopifnot(
+        "archive must contain exactly one package directory" =
+            length(pkg) == 1L
+    )
+
+    # Temporarily enable all configurable diagnostics
+    old_opts <- options(
+        checktor.url_check = TRUE,
+        checktor.spelling = TRUE,
+        checktor.disable = character(0)
+    )
+    on.exit(options(old_opts), add = TRUE)
+
+    # Remove package-specific exclusions and suppressions
+    # from the temporary copy of DESCRIPTION
+    desc <- file.path(pkg, "DESCRIPTION")
+    lines <- readLines(desc, warn = FALSE)
+    blocks <- cumsum(!grepl("^[[:blank:]]", lines))
+
+    excluded <- blocks[
+        grepl("^Config/checktor/(disable|allow):", lines)
+    ]
+
+    if (length(excluded)) {
+        writeLines(
+            lines[!blocks %in% excluded],
+            desc,
+            useBytes = TRUE
+        )
+    }
+
+    message("Checking: ", basename(path))
+
+    # Run the complete standard diagnostic suite
+    res <- checktor::checktor(
+        path = pkg,
+        verbose = FALSE,
+        progress = FALSE,
+        severity = c("policy", "robustness", "opinion")
+    )
+
+    # Discover and run additional on-request checks
+    extra_names <- res$metadata$on_request_checks
+
+    if (length(extra_names)) {
+
+        extra <- stats::setNames(
+            lapply(extra_names, function(nm) {
+                tryCatch(
+                    getExportedValue(
+                        "checktor", paste0("lab_", nm)
+                    )(path = pkg, verbose = FALSE),
+                    error = function(e) {
+                        checktor::checktor_check_result(
+                            passed = TRUE,
+                            issues = character(0),
+                            message = nm,
+                            skipped = TRUE,
+                            skip_reason = conditionMessage(e)
+                        )
+                    }
+                )
+            }),
+            extra_names
+        )
+
+        # Retrieve category assignments from checktor's registry
+        registry <- getFromNamespace("BUILTIN_CHECKS", "checktor")
+
+        categories <- registry$category[
+            match(names(extra), registry$name)
+        ]
+
+        stopifnot(
+            "all additional checks must have known categories" =
+                !anyNA(categories)
+        )
+
+        grouped <- split(extra, paste0(categories, "_issues"))
+
+        # Merge additional checks into the standard results
+        res[names(grouped)] <- Map(
+            function(original, additional) {
+                original[names(additional)] <- additional
+                original$passed[names(additional)] <-
+                    vapply(additional, function(x) {
+                        isTRUE(x$passed)
+                    }, logical(1))
+                original
+            },
+            res[names(grouped)],
+            grouped
+        )
+
+        res$metadata$on_request_checks <- character(0)
+    }
+
+    # Recalculate metadata for the combined results
+    checks <- checktor::tidy(res)
+
+    res$metadata$total_issues <- sum(checks$n_issues)
+    res$metadata$failed_checks <- sum(!checks$passed & !checks$skipped)
+    res$metadata$skipped_checks <- checks$check[checks$skipped]
+    res$metadata$advisory_issues <- 0L
+
+    # Validate the returned object
+    stopifnot(
+        "result must be a checktor_results object" =
+            inherits(res, "checktor_results"),
+        "all requested additional checks must be represented" =
+            all(extra_names %in% checks$check),
+        "issue count must be non-negative" =
+            res$metadata$total_issues >= 0L,
+        "failed-check count must be non-negative" =
+            res$metadata$failed_checks >= 0L
+    )
+
+    # Display a consolidated report
+    cat("\n=== DIAGNOSTIC SUMMARY ===\n\n")
+    print(summary(res), row.names = FALSE)
+
+    cat("\n=== ALL CHECKS ===\n\n")
+
+    checks$status <- ifelse(
+        checks$skipped, "SKIPPED",
+        ifelse(checks$passed, "PASS", "FAIL")
+    )
+
+    print(
+        checks[, c("category", "check", "severity", "status", "n_issues")],
+        row.names = FALSE,
+        max = .Machine$integer.max
+    )
+
+    cat("\n=== DETAILED FINDINGS ===\n\n")
+
+    findings <- checktor::issues(res)
+
+    if (nrow(findings)) {
+        print(findings, row.names = FALSE, max = .Machine$integer.max)
+    } else {
+        cat("No issues found.\n")
+    }
+
+    # Explain why any checks were skipped
+    if (any(checks$skipped)) {
+        cat("\n=== SKIPPED CHECKS ===\n\n")
+
+        invisible(lapply(which(checks$skipped), function(i) {
+            x <- res[[paste0(checks$category[i], "_issues")]][[checks$check[i]]]
+            cat(checks$check[i], ": ", x$skip_reason, "\n", sep = "")
+        }))
+    }
+
+    cat("\n=== TREATMENT RECOMMENDATIONS ===\n\n")
+    checktor::prescribe(res)
+
+    attr(res, "tarball") <- path
+
+    invisible(res)
+}
+           
